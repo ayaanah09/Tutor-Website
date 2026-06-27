@@ -1,0 +1,44 @@
+# ============================================================
+# Keep the free Supabase project awake.
+# ------------------------------------------------------------
+# A free Supabase project pauses after 7 days with no requests.
+# This workflow sends one tiny request every 3 days so that never
+# happens. It runs on GitHub's servers for free (public repos).
+#
+# SETUP (one time):
+#   1. In your GitHub repo, go to:
+#        Settings -> Secrets and variables -> Actions -> New repository secret
+#   2. Add TWO secrets (names must match exactly):
+#        SUPABASE_URL       = your Project URL (https://xxxx.supabase.co)
+#        SUPABASE_ANON_KEY  = your anon public key
+#   3. Commit this file. The job then runs automatically on schedule.
+#      You can also trigger it by hand from the repo's "Actions" tab.
+# ============================================================
+
+name: Keep Supabase awake
+
+on:
+  schedule:
+    # Runs at 12:00 UTC every 3rd day. (GitHub cron is UTC.)
+    - cron: "0 12 */3 * *"
+  workflow_dispatch:        # lets you run it manually from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST endpoint
+        run: |
+          echo "Pinging Supabase to keep the project active..."
+          # A harmless request to the REST API. A 200 or 401/404 all
+          # count as activity and reset the 7-day inactivity timer.
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/subjects?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          echo "Supabase responded with HTTP $HTTP_CODE"
+          if [ "$HTTP_CODE" = "000" ]; then
+            echo "No response - the project may already be paused or the URL is wrong."
+            exit 1
+          fi
+          echo "Done. Activity recorded."
